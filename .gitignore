@@ -4,3 +4,4 @@ venv
 *.pem
 main.py
 dist
+**/__pycache__
