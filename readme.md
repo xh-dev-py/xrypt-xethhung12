@@ -1,4 +1,7 @@
 # Installation
+```shell
+pip install -U xrypt-xethhung12
+```
 
 # Usage
 ```shell
