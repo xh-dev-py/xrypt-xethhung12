@@ -2,7 +2,7 @@
 
 # Usage
 ```shell
-from xcrypt_xethhung12.xcrypt import load_pub, load_pri, hybrid_encrypt, hybrid_decrypt
+from xrypt_xethhung12.xrypt import load_pub, load_pri, hybrid_encrypt, hybrid_decrypt
 from Crypto.Cipher import PKCS1_OAEP as Cipher
 from Crypto.Signature import PKCS1_v1_5
 
@@ -29,4 +29,28 @@ pri={pri}
 pub={pub}
 openssl genrsa -out $pri 4096
 openssl rsa -in $pri -outform PEM -pubout -out $pub
+```
+
+## Build 
+```shell
+rm -fr dist
+python3 -m build
+```
+
+
+## Build and Deploy
+```shell
+rm -fr dist
+python3 -m build
+twine upload dist/* -u __token__ -p $pwd
+```
+
+## Update version dev
+```shell
+python3 -m xh_py_project_versioning --patch
+```
+
+## Update version
+```shell
+python3 -m xh_py_project_versioning --patch -d
 ```
