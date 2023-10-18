@@ -18,12 +18,12 @@ def load_pri(file):
         return RSA.import_key(f.read())
 
 
-def hybrid_encrypt(sender_key, receiver_key, data,
+def hybrid_encrypt(receiver_pub_key, sender_pri_key, data,
                    get_cipher=lambda key: PKCS1_OAEP.new(key),
                    get_signer=lambda key: PKCS1_v1_5.new(key)
                    ):
-    sender_cipher = get_cipher(sender_key)
-    receiver_signer = get_signer(receiver_key)
+    sender_cipher = get_cipher(receiver_pub_key)
+    receiver_signer = get_signer(sender_pri_key)
     to_b64_str = lambda x: base64.b64encode(x).decode("utf-8")
     key = Random.new().read(32)
     key_str = to_b64_str(sender_cipher.encrypt(key))
@@ -39,18 +39,18 @@ def hybrid_encrypt(sender_key, receiver_key, data,
     return (key_str, iv_str, encrypt_data, sign)
 
 
-def hybrid_decrypt(receiver_key, sender_key, key_str, iv_str, data_str, sign, check_sign=True,
+def hybrid_decrypt(receiver_pri_key, sender_pub_key, key_str, iv_str, data_byte, sign, check_sign=True,
                    get_cipher=lambda key: PKCS1_OAEP.new(key),
                    get_verifier=lambda key: PKCS1_v1_5.new(key)
                    ):
-    receiver_cipher = get_cipher(receiver_key)
-    sender_verifier = get_verifier(sender_key)
+    receiver_cipher = get_cipher(receiver_pri_key)
+    sender_verifier = get_verifier(sender_pub_key)
     key = receiver_cipher.decrypt(base64.b64decode(key_str.encode("utf-8")))
     iv = receiver_cipher.decrypt(base64.b64decode(iv_str.encode("utf-8")))
 
     aes = AES.new(key, AES.MODE_CBC, iv)
 
-    data = unpad(aes.decrypt(base64.b64decode(data_str.encode("utf-8"))), AES.block_size)
+    data = unpad(aes.decrypt(base64.b64decode(data_byte)), AES.block_size)
 
     if check_sign:
         digest = SHA512.new()
