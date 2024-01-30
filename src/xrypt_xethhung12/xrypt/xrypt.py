@@ -1,25 +1,40 @@
 import base64
 import json
 from dataclasses import dataclass
+from typing import Optional
 
 from Crypto import Random
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad, pad
-from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric.types import PublicKeyTypes, PrivateKeyTypes
 
 
-def read_public_key_from_pem(file_path) -> PublicKeyTypes:
-    with open(file_path, 'rb') as key_file:
-        public_key = serialization.load_pem_public_key(key_file.read())
-    return public_key
+class Signer:
+    def __init__(self, private_key: PrivateKeyTypes):
+        self.private_key = private_key
+
+    def sign(self, data: str) -> 'SignedData':
+        raw_data = data
+        data = data.encode('utf-8')
+        signature = self.private_key.sign(data, padding=padding.PKCS1v15(), algorithm=hashes.SHA256())
+        signature = base64.b64encode(signature).decode('ascii')
+        return SignedData(signature, raw_data)
 
 
-def read_private_key_from_pem(file_path, password=None) -> PrivateKeyTypes:
-    with open(file_path, 'rb') as key_file:
-        private_key = serialization.load_pem_private_key(key_file.read(), password=password)
-    return private_key
+class Verifier:
+    def __init__(self, public_key: PublicKeyTypes):
+        self.public_key = public_key
+
+    def verify(self, signed_data: 'SignedData') -> bool:
+        try:
+            self.public_key.verify(base64.b64decode(signed_data.signature.encode('ascii')),
+                                   signed_data.data.encode('utf-8'), padding=padding.PKCS1v15(),
+                                   algorithm=hashes.SHA256())
+            return True
+        except Exception:
+            return False
 
 
 class DeEnCryptor:
@@ -28,46 +43,47 @@ class DeEnCryptor:
         self.private_key = private_key
 
     def encryptToContainer(self, r_pub: PublicKeyTypes, data: str) -> 'DataContainer':
+        signature = Signer(self.private_key).sign(data).signature
         data = data.encode('utf-8')
-        signature = self.private_key.sign(data, padding=padding.PKCS1v15(), algorithm=hashes.SHA256())
-        signature = base64.b64encode(signature).decode('ascii')
+        # signature = self.private_key.sign(data, padding=padding.PKCS1v15(), algorithm=hashes.SHA256())
+        # signature = base64.b64encode(signature).decode('ascii')
         iv = Random.new().read(AES.block_size)
-        enIv = base64.b64encode(iv)
-        enIv = r_pub.encrypt(enIv, padding=padding.PKCS1v15())
-        enIv = base64.b64encode(enIv).decode('ascii')
+        en_iv = base64.b64encode(iv)
+        en_iv = r_pub.encrypt(en_iv, padding=padding.PKCS1v15())
+        en_iv = base64.b64encode(en_iv).decode('ascii')
 
         key = Random.new().read(32)
-        enKey = base64.b64encode(key)
-        enKey = r_pub.encrypt(enKey, padding=padding.PKCS1v15())
-        enKey = base64.b64encode(enKey).decode('ascii')
+        en_key = base64.b64encode(key)
+        en_key = r_pub.encrypt(en_key, padding=padding.PKCS1v15())
+        en_key = base64.b64encode(en_key).decode('ascii')
         cipher = AES.new(key, AES.MODE_CBC, iv)
-        # data = base64.b64encode(data)
         cipher_text = pad(data, AES.block_size)
         cipher_text = cipher.encrypt(cipher_text)
         cipher_text = base64.b64encode(cipher_text).decode('ascii')
 
-        return DataContainer(data=cipher_text, iv=enIv, key=enKey, sign=signature)
+        return DataContainer(data=cipher_text, iv=en_iv, key=en_key, sign=signature)
 
     def encryptToJsonContainer(self, public_key: PublicKeyTypes, data: str) -> str:
         return json.dumps(self.encryptToContainer(public_key, data).to_dict())
 
-    def decryptContainer(self, public_key: PublicKeyTypes, container: 'DataContainer') -> str:
+    def decryptContainer(self, public_key: PublicKeyTypes, container: 'DataContainer') -> Optional[str]:
         data = base64.b64decode(container.data)
-        keyBytes = base64.b64decode(container.key.encode("ascii"))
-        keyBytes = self.private_key.decrypt(keyBytes, padding.PKCS1v15())
-        keyBytes = base64.b64decode(keyBytes)
+        key_bytes = base64.b64decode(container.key.encode("ascii"))
+        key_bytes = self.private_key.decrypt(key_bytes, padding.PKCS1v15())
+        key_bytes = base64.b64decode(key_bytes)
 
-        ivBytes = base64.b64decode(container.iv.encode("ascii"))
-        ivBytes = self.private_key.decrypt(ivBytes, padding.PKCS1v15())
-        ivBytes = base64.b64decode(ivBytes)
+        iv_bytes = base64.b64decode(container.iv.encode("ascii"))
+        iv_bytes = self.private_key.decrypt(iv_bytes, padding.PKCS1v15())
+        iv_bytes = base64.b64decode(iv_bytes)
 
-        cipher = AES.new(keyBytes, AES.MODE_CBC, ivBytes)
+        cipher = AES.new(key_bytes, AES.MODE_CBC, iv_bytes)
         decrypted = cipher.decrypt(data)
         decrypted = unpad(decrypted, 16)
 
-        sign = base64.b64decode(container.sign.encode("ascii"))
-        public_key.verify(sign, decrypted, padding=padding.PKCS1v15(), algorithm=hashes.SHA256())
-        return decrypted.decode("utf-8")
+        if Verifier(public_key).verify(SignedData(container.sign, decrypted.decode("utf-8"))):
+            return decrypted.decode("utf-8")
+        else:
+            return None
 
 
 @dataclass
@@ -83,3 +99,16 @@ class DataContainer:
 
     def to_dict(self) -> dict:
         return {'sign': self.sign, 'iv': self.iv, 'key': self.key, 'data': self.data}
+
+
+@dataclass
+class SignedData:
+    signature: str
+    data: str
+
+    @staticmethod
+    def from_json(d: dict) -> 'SignedData':
+        return SignedData(d['signature'], d['data'])
+
+    def to_dict(self) -> dict:
+        return {'signature': self.signature, 'data': self.data}
