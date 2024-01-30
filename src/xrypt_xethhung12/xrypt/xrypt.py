@@ -63,8 +63,8 @@ class DeEnCryptor:
 
         return DataContainer(data=cipher_text, iv=en_iv, key=en_key, sign=signature)
 
-    def encryptToJsonContainer(self, public_key: PublicKeyTypes, data: str) -> str:
-        return json.dumps(self.encryptToContainer(public_key, data).to_dict())
+    def encryptToJsonContainer(self, public_key: PublicKeyTypes, data: str, indent: int = None) -> str:
+        return json.dumps(self.encryptToContainer(public_key, data).to_dict(), indent=indent)
 
     def decryptContainer(self, public_key: PublicKeyTypes, container: 'DataContainer') -> Optional[str]:
         data = base64.b64decode(container.data)
