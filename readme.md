@@ -5,21 +5,31 @@ pip install -U xrypt-xethhung12
 
 # Usage
 ```shell
-from xrypt_xethhung12.xrypt import load_pub, load_pri, hybrid_encrypt, hybrid_decrypt
+import json
+from xrypt_xethhung12.xrypt.xrypt import read_public_key_from_pem, read_private_key_from_pem, DeEnCryptor
 
-sender_pub = load_pub("rsa_public_key.pem")
-sender_pri = load_pri("rsa_private_key.pem")
 
-receiver_pub = load_pub("rsa_public_key_2.pem")
-receiver_pri = load_pri("rsa_private_key_2.pem")
+def load_file(file_path: str) -> dict:
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+    return data
 
-# normal case
-key_str,iv_str,encrypt_data,sign = hybrid_encrypt(receiver_pub, sender_pri, "abcd1234567890".encode("utf-8"))
-decrypted_data = hybrid_decrypt(receiver_pri, sender_pub, key_str, iv_str, encrypt_data, sign)
-# decrypted_data -> b'abcd1234567890'
 
-# incase the verify key fail
-# there will be a exception raised
+if __name__ == '__main__':
+    base_path = "./"
+    s_pub = read_public_key_from_pem(base_path + "s_pub.key")
+    s_pri = read_private_key_from_pem(base_path + "s_pri.key")
+    r_pub = read_public_key_from_pem(base_path + "r_pub.key")
+    r_pri = read_private_key_from_pem(base_path + "r_pri.key")
+    d = load_file(base_path + "encrypted-data")
+
+    deen = DeEnCryptor(s_pub, s_pri)
+    container = deen.encryptToContainer(r_pub, "helloworld")
+    containerStr = deen.encryptToJsonContainer(r_pub, "helloworld")
+    print(containerStr)
+
+    deen = DeEnCryptor(r_pub, r_pri)
+    print(deen.decryptContainer(s_pub, container))
 ```
 
 # Scripts

@@ -1,13 +1,13 @@
 import base64
 import json
+from dataclasses import dataclass
 
 from Crypto import Random
-from Crypto.Util.Padding import unpad,pad
-from cryptography.hazmat.primitives import serialization, hashes
-from cryptography.hazmat.primitives.asymmetric.types import PublicKeyTypes, PrivateKeyTypes
-from dataclasses import dataclass
-from cryptography.hazmat.primitives.asymmetric import padding
 from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad, pad
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric.types import PublicKeyTypes, PrivateKeyTypes
 
 
 def read_public_key_from_pem(file_path) -> PublicKeyTypes:
@@ -26,7 +26,6 @@ class DeEnCryptor:
     def __init__(self, public_key: PublicKeyTypes, private_key: PrivateKeyTypes):
         self.public_key = public_key
         self.private_key = private_key
-
 
     def encryptToContainer(self, r_pub: PublicKeyTypes, data: str) -> 'DataContainer':
         data = data.encode('utf-8')
@@ -51,6 +50,7 @@ class DeEnCryptor:
 
     def encryptToJsonContainer(self, public_key: PublicKeyTypes, data: str) -> str:
         return json.dumps(self.encryptToContainer(public_key, data).to_dict())
+
     def decryptContainer(self, public_key: PublicKeyTypes, container: 'DataContainer') -> str:
         data = base64.b64decode(container.data)
         keyBytes = base64.b64decode(container.key.encode("ascii"))
