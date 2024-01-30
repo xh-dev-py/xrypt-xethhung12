@@ -1,5 +1,6 @@
 build
 twine
 xh-py-project-versioning
-Crypto
+crypto
 cryptography
+pycryptodome
